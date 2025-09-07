@@ -1,0 +1,106 @@
+# Critical Keywords Detection Rule
+
+name: "Critical Threat Keywords Detected"
+type: any
+index: posts*
+is_enabled: true
+
+# Check every 2 minutes
+run_every:
+  minutes: 2
+
+# Look back 10 minutes
+buffer_time:
+  minutes: 10
+
+# Alert filters - detect critical threat keywords
+filter:
+- query:
+    bool:
+      should:
+        # High-priority malware indicators
+        - match:
+            text: "ransomware"
+        - match:
+            text: "zero-day"
+        - match:
+            title: "exploit"
+        - match:
+            text: "CVE-2024"
+        - match:
+            text: "database dump"
+        - match:
+            text: "credentials leak"
+        - match:
+            text: "credit card dump"
+        - match:
+            text: "fullz"
+        - match:
+            text: "SSN"
+        - match:
+            text: "social security"
+        # Add more patterns as needed
+      minimum_should_match: 1
+
+# Include fields in alert
+include:
+  - title
+  - url
+  - text
+  - timestamp
+  - source_site
+  - threat_types
+
+# Alert methods
+alert:
+  # Log alert (always enabled)
+  - "debug"
+  
+  # Email alert (configure SMTP if needed)
+  # - "email"
+
+# Alert content
+alert_subject: "🚨 CRITICAL THREAT DETECTED: {0}"
+alert_subject_args:
+  - title
+
+alert_text: |
+  Critical threat keywords detected in dark web monitoring!
+  
+  📊 **Alert Details:**
+  - **Title:** {0}
+  - **Source:** {1} 
+  - **URL:** {2}
+  - **Timestamp:** {3}
+  - **Threat Types:** {4}
+  
+  📝 **Content Preview:**
+  {5}
+  
+  🔗 **Full URL:** {2}
+  
+  Please investigate immediately!
+
+alert_text_args:
+  - title
+  - source_site
+  - url
+  - timestamp
+  - threat_types
+  - text
+
+# Email configuration (uncomment and configure if needed)
+# email:
+#   - "security@yourcompany.com"
+# smtp_host: "smtp.gmail.com"
+# smtp_port: 587
+# smtp_ssl: true
+# from_addr: "alerts@yourcompany.com"
+# smtp_auth_file: "/opt/elastalert/smtp_auth.yaml"
+
+# Prevent alert spam
+realert:
+  minutes: 30
+
+# Maximum 10 alerts per rule run
+max_query_size: 10

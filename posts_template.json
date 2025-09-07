@@ -1,0 +1,13 @@
+{
+  "index_patterns": ["posts*","posts"],
+  "template": {
+    "mappings": {
+      "properties": {
+        "url": {"type": "keyword"},
+        "title": {"type": "text", "analyzer": "english"},
+        "text": {"type": "text", "analyzer": "english"},
+        "timestamp": {"type": "date"}
+      }
+    }
+  }
+}

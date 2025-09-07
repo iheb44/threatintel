@@ -1,0 +1,390 @@
+# Dark Web Crawler Configuration - Comprehensive Sources
+
+use_tor: false
+tor_proxy: "socks5h://tor:9050"
+
+# Crawling parameters
+crawl_interval: 1800  # 30 minutes
+max_pages_per_seed: 5  # Reduced to avoid overload
+request_delay: 3
+timeout: 20
+
+targets:
+  # === TIER 1: HIGH-QUALITY SECURITY NEWS ===
+  - name: "krebs_security"
+    url: "https://krebsonsecurity.com/"
+    type: "security_news"
+    enabled: true
+    max_pages: 5
+    priority: "high"
+    
+  - name: "bleeping_computer"
+    url: "https://www.bleepingcomputer.com/news/security/"
+    type: "security_news"
+    enabled: true
+    max_pages: 5
+    priority: "high"
+    
+  - name: "thehackernews"
+    url: "https://thehackernews.com/"
+    type: "security_news"
+    enabled: true
+    max_pages: 5
+    priority: "high"
+    
+  - name: "security_week"
+    url: "https://www.securityweek.com/"
+    type: "security_news"
+    enabled: true
+    max_pages: 4
+    
+  - name: "dark_reading"
+    url: "https://www.darkreading.com/"
+    type: "security_news"
+    enabled: true
+    max_pages: 4
+
+  # === TIER 1: VULNERABILITY DATABASES ===
+  - name: "nvd_nist"
+    url: "https://nvd.nist.gov/vuln/search/results?form_type=Basic&results_type=overview&search_type=all"
+    type: "vulnerability_db"
+    enabled: true
+    max_pages: 4
+    priority: "high"
+    
+  - name: "cvedetails"
+    url: "https://www.cvedetails.com/"
+    type: "vulnerability_db"
+    enabled: true
+    max_pages: 3
+    
+  - name: "opencve"
+    url: "https://www.opencve.io/cve"
+    type: "vulnerability_db"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 1: GOVERNMENT & OFFICIAL SOURCES ===
+  - name: "cisa_advisories"
+    url: "https://www.cisa.gov/news-events/cybersecurity-advisories"
+    type: "government_advisory"
+    enabled: true
+    max_pages: 4
+    priority: "high"
+    
+  - name: "us_cert_alerts"
+    url: "https://www.cisa.gov/news-events/alerts"
+    type: "government_advisory"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 1: CORPORATE THREAT INTELLIGENCE ===
+  - name: "microsoft_security"
+    url: "https://www.microsoft.com/en-us/security/blog/"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 4
+    priority: "high"
+    
+  - name: "google_threat_analysis"
+    url: "https://blog.google/threat-analysis-group/"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 3
+    
+  - name: "crowdstrike_blog"
+    url: "https://www.crowdstrike.com/blog/"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 4
+    
+  - name: "mandiant"
+    url: "https://www.mandiant.com/resources/blog"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 4
+    
+  - name: "trendmicro_research"
+    url: "https://www.trendmicro.com/en_us/research.html"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 3
+    
+  - name: "kaspersky_securelist"
+    url: "https://securelist.com/"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 4
+    
+  - name: "checkpoint_research"
+    url: "https://research.checkpoint.com/"
+    type: "corporate_intel"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 2: MALWARE ANALYSIS & RESEARCH ===
+  
+  # DISABLED - Requires JavaScript/Bot Protection
+  - name: "urlhaus_recent"
+    url: "https://urlhaus.abuse.ch/browse/"
+    type: "threat_feed"
+    enabled: false  # Bot protection detected
+    max_pages: 3
+    requires_javascript: true
+    note: "Cloudflare protection - cannot crawl without browser automation"
+    
+  - name: "any_run_recent"
+    url: "https://any.run/malware-trends/"
+    type: "malware_analysis"
+    enabled: false  # Promotional content detected
+    max_pages: 3
+    requires_javascript: true
+    
+  - name: "malwarebytes_labs"
+    url: "https://blog.malwarebytes.com/"
+    type: "malware_research"
+    enabled: true
+    max_pages: 4
+    
+  - name: "virustotal_blog"
+    url: "https://blog.virustotal.com/"
+    type: "malware_research"
+    enabled: true
+    max_pages: 3
+    
+  - name: "malware_traffic_analysis"
+    url: "https://www.malware-traffic-analysis.net/"
+    type: "malware_analysis"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 2: SECURITY FORUMS & COMMUNITIES ===
+  - name: "wilders_security"
+    url: "https://www.wilderssecurity.com/forums/"
+    type: "security_forum"
+    enabled: true
+    max_pages: 4
+    
+  - name: "malwaretips"
+    url: "https://malwaretips.com/"
+    type: "security_forum"
+    enabled: true
+    max_pages: 4
+    
+  - name: "sans_isc"
+    url: "https://isc.sans.edu/"
+    type: "security_research"
+    enabled: true
+    max_pages: 4
+
+  # === TIER 2: SOCIAL MEDIA OSINT ===
+  - name: "reddit_netsec"
+    url: "https://www.reddit.com/r/netsec.json"
+    type: "social_media"
+    enabled: true
+    max_pages: 3
+    
+  - name: "reddit_cybersecurity"
+    url: "https://www.reddit.com/r/cybersecurity.json"
+    type: "social_media"
+    enabled: true
+    max_pages: 3
+    
+  - name: "reddit_malware"
+    url: "https://www.reddit.com/r/Malware.json"
+    type: "social_media"
+    enabled: true
+    max_pages: 2
+
+  # === TIER 2: CRYPTOCURRENCY & FINANCIAL CRIME ===
+  - name: "chainanalysis_blog"
+    url: "https://blog.chainalysis.com/"
+    type: "crypto_intel"
+    enabled: true
+    max_pages: 3
+    
+  - name: "elliptic_blog"
+    url: "https://www.elliptic.co/blog"
+    type: "crypto_intel"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 3: BREACH & LEAK MONITORING ===
+  - name: "haveibeenpwned_api"
+    url: "https://haveibeenpwned.com/api/v3/breaches"
+    type: "breach_monitoring"
+    enabled: false  # Requires API key
+    max_pages: 1
+    requires_api_key: true
+
+  # === TIER 3: THREAT FEEDS & IOC SOURCES ===
+  - name: "alienvault_otx"
+    url: "https://otx.alienvault.com/browse/global/pulses"
+    type: "threat_feed"
+    enabled: true
+    max_pages: 3
+    
+  - name: "phishtank"
+    url: "https://phishtank.org/"
+    type: "phishing_intel"
+    enabled: false  # Often requires authentication
+    max_pages: 3
+    
+  - name: "openphish"
+    url: "https://openphish.com/"
+    type: "phishing_intel"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 3: SPECIALIZED SOURCES ===
+  - name: "exploit_db"
+    url: "https://www.exploit-db.com/"
+    type: "exploit_database"
+    enabled: true
+    max_pages: 4
+    
+  - name: "packet_storm"
+    url: "https://packetstormsecurity.com/"
+    type: "exploit_database"
+    enabled: true
+    max_pages: 3
+
+  # === TIER 4: INDUSTRY SPECIFIC ===
+  - name: "healthcare_cybersecurity"
+    url: "https://healthitsecurity.com/"
+    type: "industry_security"
+    enabled: true
+    max_pages: 3
+    
+  - name: "cloud_security_alliance"
+    url: "https://cloudsecurityalliance.org/blog/"
+    type: "industry_security"
+    enabled: true
+    max_pages: 2
+
+  # === TIER 4: REGIONAL SOURCES ===
+  - name: "enisa_eu"
+    url: "https://www.enisa.europa.eu/news"
+    type: "regional_security"
+    enabled: true
+    max_pages: 2
+    
+  - name: "ncsc_uk"
+    url: "https://www.ncsc.gov.uk/news"
+    type: "regional_security"
+    enabled: true
+    max_pages: 2
+
+  # === PASTE SITES (DISABLED - HIGH SPAM/LOW QUALITY) ===
+  - name: "pastebin_archive"
+    url: "https://pastebin.com/archive"
+    type: "paste_site"
+    enabled: false  # High spam content, low value
+    max_pages: 3
+    high_spam_risk: true
+    
+  - name: "rentry_co"
+    url: "https://rentry.co/"
+    type: "paste_site"
+    enabled: false
+    max_pages: 2
+    high_spam_risk: true
+
+  # === DARK WEB SOURCES (REQUIRES TOR & LEGAL CLEARANCE) ===
+  - name: "dread_forum"
+    url: "http://dreadytofatroptsdj6io7l3xptbet6onoyno2yv7jicoxknyazubrad.onion"
+    type: "dark_forum"
+    enabled: false
+    max_pages: 5
+    requires_tor: true
+    legal_warning: true
+    
+  - name: "ahmia_search"
+    url: "http://juhanurmihxlp77nkq76byazcldy2hlmovfu2epvl5ankdibsot4csyd.onion"
+    type: "dark_search"
+    enabled: false
+    max_pages: 3
+    requires_tor: true
+
+# Source priority configuration
+source_priority:
+  high: 
+    - "krebs_security"
+    - "bleeping_computer"
+    - "microsoft_security"
+    - "cisa_advisories"
+    - "thehackernews"
+    - "crowdstrike_blog"
+  medium:
+    - "malwarebytes_labs"
+    - "wilders_security"
+    - "reddit_netsec"
+    - "exploit_db"
+    - "sans_isc"
+    - "kaspersky_securelist"
+  low:
+    - "paste_sites"
+    - "social_media"
+    - "regional_sources"
+
+# Content quality settings
+content_quality:
+  min_content_length: 100
+  max_content_length: 15000
+  enable_spam_filtering: true
+  enable_bot_detection: true
+  enable_duplicate_detection: true
+  enable_promotional_filtering: true
+  quality_score_threshold: 2
+
+# Rate limiting by domain (seconds between requests)
+rate_limits:
+  "reddit.com": 3
+  "github.com": 2
+  "microsoft.com": 2
+  "google.com": 2
+  "cisa.gov": 2
+  "nvd.nist.gov": 3
+  default: 2
+
+# Pagination patterns for sites that support it
+pagination_patterns:
+  "bleeping_computer": "https://www.bleepingcomputer.com/news/security/page/{page}/"
+  "packet_storm": "https://packetstormsecurity.com/page{page}/"
+  "exploit_db": "https://www.exploit-db.com/?pg={page}"
+
+# JavaScript-required sites (cannot crawl without browser automation)
+javascript_required:
+  - "urlhaus_recent"
+  - "any_run_recent"
+  - "hybrid_analysis_blog"
+  - "phishtank"
+  - "virustotal"
+
+# Sites with bot protection (will be automatically disabled)
+bot_protected_sites:
+  - "urlhaus.abuse.ch"
+  - "any.run"
+  - "hybrid-analysis.com"
+  - "virustotal.com"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  log_filtering_stats: true
+  log_source_performance: true
+  log_threats_detected: true
+  log_iocs_found: false  # Can be verbose
+  
+# Performance tuning
+performance:
+  max_concurrent_requests: 1  # Sequential for safety
+  connection_pool_size: 10
+  socket_timeout: 20
+  read_timeout: 30
+  
+# Storage settings
+storage:
+  max_visited_urls: 1000  # Keep last N URLs in memory
+  max_content_hashes: 5000  # Keep last N hashes for dedup
+  state_save_interval: 300  # Save state every 5 minutes

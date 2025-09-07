@@ -1,0 +1,129 @@
+# Organization Monitoring Rule
+# Monitors for mentions of specific organizations/companies
+
+name: "Organization Mentioned in Dark Web"
+type: any
+index: posts*
+is_enabled: true
+
+run_every:
+  minutes: 10
+
+buffer_time:
+  minutes: 30
+
+# Monitor for specific organization mentions
+filter:
+- query:
+    bool:
+      should:
+        # Add your organization names here
+        - match_phrase:
+            text: "microsoft"
+        - match_phrase:
+            text: "google"
+        - match_phrase:
+            text: "amazon"
+        - match_phrase:
+            text: "apple"
+        - match_phrase:
+            text: "facebook"
+        - match_phrase:
+            text: "tesla"
+        - match_phrase:
+            text: "nvidia"
+        
+        # Government organizations
+        - match_phrase:
+            text: "department of defense"
+        - match_phrase:
+            text: "fbi"
+        - match_phrase:
+            text: "cia"
+        - match_phrase:
+            text: "nsa"
+        
+        # Financial institutions
+        - match_phrase:
+            text: "bank of america"
+        - match_phrase:
+            text: "wells fargo"
+        - match_phrase:
+            text: "chase bank"
+        - match_phrase:
+            text: "citibank"
+        
+        # Healthcare
+        - match_phrase:
+            text: "kaiser permanente"
+        - match_phrase:
+            text: "anthem"
+        - match_phrase:
+            text: "humana"
+            
+        # Add more organizations as needed
+        
+      minimum_should_match: 1
+
+# Only alert if combined with threat indicators
+filter:
+- query:
+    bool:
+      must:
+        - bool:
+            should:
+              - match: text: "hack"
+              - match: text: "breach"
+              - match: text: "leak"
+              - match: text: "dump"
+              - match: text: "exploit"
+              - match: text: "vulnerability"
+              - match: text: "ransomware"
+              - match: text: "stolen"
+            minimum_should_match: 1
+
+include:
+  - title
+  - url
+  - text
+  - timestamp
+  - source_site
+  - threat_types
+
+alert:
+  - "debug"
+
+alert_subject: "🎯 ORGANIZATION TARGETED: {0}"
+alert_subject_args:
+  - source_site
+
+alert_text: |
+  🎯 **HIGH PRIORITY: Organization Mentioned in Dark Web Context**
+  
+  📊 **Target Intelligence:**
+  - **Source Site:** {0}
+  - **URL:** {1}
+  - **Detection Time:** {2}
+  - **Post Title:** {3}
+  
+  📝 **Content Analysis:**
+  {4}
+  
+  🔍 **Threat Assessment Required**
+  This post mentions a major organization in conjunction with threat indicators.
+  Immediate investigation recommended to assess potential risks.
+  
+  🔗 **Source:** {1}
+
+alert_text_args:
+  - source_site
+  - url
+  - timestamp
+  - title
+  - text
+
+realert:
+  hours: 6
+
+# Higher priority - check more frequently
+max_query_size: 20
