@@ -1,0 +1,89 @@
+{
+  "dashboard": {
+    "title": "Celery Task Monitoring",
+    "tags": ["celery", "tasks", "workers"],
+    "panels": [
+      {
+        "title": "Active Workers",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(celery_worker_online{})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Task Queue Length",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "celery_tasks_active{}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "title": "Task Execution Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(celery_tasks_succeeded_total{}[5m])",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 6
+        }
+      },
+      {
+        "title": "Task Failures",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(celery_tasks_failed_total{}[5m])",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 6
+        }
+      },
+      {
+        "title": "Task Types",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "count by (name) (celery_tasks_succeeded_total{})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        }
+      }
+    ],
+    "refresh": "30s"
+  }
+}

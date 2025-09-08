@@ -3,6 +3,7 @@
 name: "PII Data Breach Detected"
 type: any
 index: posts*
+timestamp_field: timestamp
 is_enabled: true
 
 run_every:

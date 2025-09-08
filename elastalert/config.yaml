@@ -6,6 +6,8 @@ es_port: 9200
 es_url_prefix: ''
 es_username: ''
 es_password: ''
+es_use_ssl: False
+verify_certs: False
 
 # ElastAlert settings
 rules_folder: /opt/elastalert/rules
@@ -23,38 +25,28 @@ writeback_alias: elastalert_alerts
 alert_time_limit:
   days: 2
 
-# Logging
+# Logging - FIXED: Use container path and simpler config
 logging:
   version: 1
-  incremental: false
-  disable_existing_loggers: false
   formatters:
-    logline:
-      format: '%(asctime)s %(levelname)+8s %(name)+20s %(message)s'
+    simple:
+      format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+      datefmt: '%Y-%m-%d %H:%M:%S'
   handlers:
     console:
       class: logging.StreamHandler
-      formatter: logline
       level: INFO
-      stream: ext://sys.stderr
-    file:
-      class: logging.FileHandler
-      formatter: logline
-      level: INFO
-      filename: /var/log/elastalert.log
+      formatter: simple
+      stream: ext://sys.stdout
   loggers:
     elastalert:
       level: INFO
-      handlers: [console, file]
+      handlers: [console]
       propagate: false
     elasticsearch:
       level: WARNING
-      handlers: [console, file]
-      propagate: false
-    elasticsearch.trace:
-      level: WARNING
-      handlers: [console, file]
+      handlers: [console]
       propagate: false
   root:
-    level: INFO
-    handlers: [console, file]
+    level: WARNING
+    handlers: [console]

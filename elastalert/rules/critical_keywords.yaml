@@ -3,6 +3,7 @@
 name: "Critical Threat Keywords Detected"
 type: any
 index: posts*
+timestamp_field: timestamp
 is_enabled: true
 
 # Check every 2 minutes

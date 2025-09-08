@@ -1,0 +1,73 @@
+{
+  "dashboard": {
+    "title": "Elastalert Monitoring",
+    "tags": ["elastalert", "alerts", "security"],
+    "panels": [
+      {
+        "title": "Alerts Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(elasticsearch_index_docs_count{index='elastalert_status'}[5m])",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "title": "Alert Severity",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "count by (severity) (elasticsearch_index_docs_count{index='elastalert_status'})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "title": "Top Alert Rules",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "count by (rule_name) (elasticsearch_index_docs_count{index='elastalert_status'})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "title": "Recent Alerts",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, elasticsearch_index_docs_count{index='elastalert_status'})",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 16
+        }
+      }
+    ],
+    "refresh": "30s"
+  }
+}
