@@ -1,107 +1,45 @@
-# Critical Keywords Detection Rule
-
-name: "Critical Threat Keywords Detected"
+name: "Critical IOC Detection"
 type: any
-index: posts*
+index: iocs*
 timestamp_field: timestamp
 is_enabled: true
 
-# Check every 2 minutes
 run_every:
   minutes: 2
 
-# Look back 10 minutes
 buffer_time:
-  minutes: 10
+  minutes: 5
 
-# Alert filters - detect critical threat keywords
+# Alert on ALL IOCs initially (for testing)
 filter:
 - query:
-    bool:
-      should:
-        # High-priority malware indicators
-        - match:
-            text: "ransomware"
-        - match:
-            text: "zero-day"
-        - match:
-            title: "exploit"
-        - match:
-            text: "CVE-2024"
-        - match:
-            text: "database dump"
-        - match:
-            text: "credentials leak"
-        - match:
-            text: "credit card dump"
-        - match:
-            text: "fullz"
-        - match:
-            text: "SSN"
-        - match:
-            text: "social security"
-        # Add more patterns as needed
-      minimum_should_match: 1
+    match_all: {}
 
-# Include fields in alert
 include:
-  - title
-  - url
-  - text
+  - ioc_value
+  - ioc_type
+  - source_feed
   - timestamp
-  - source_site
-  - threat_types
 
-# Alert methods
 alert:
-  # Log alert (always enabled)
   - "debug"
-  
-  # Email alert (configure SMTP if needed)
-  # - "email"
 
-# Alert content
-alert_subject: "🚨 CRITICAL THREAT DETECTED: {0}"
+alert_subject: "IOC Detected: {0}"
 alert_subject_args:
-  - title
+  - ioc_value
 
 alert_text: |
-  Critical threat keywords detected in dark web monitoring!
-  
-  📊 **Alert Details:**
-  - **Title:** {0}
-  - **Source:** {1} 
-  - **URL:** {2}
-  - **Timestamp:** {3}
-  - **Threat Types:** {4}
-  
-  📝 **Content Preview:**
-  {5}
-  
-  🔗 **Full URL:** {2}
-  
-  Please investigate immediately!
+  IOC detected in threat intelligence feed!
+  - Value: {0}
+  - Type: {1} 
+  - Source: {2}
+  - Time: {3}
 
 alert_text_args:
-  - title
-  - source_site
-  - url
+  - ioc_value
+  - ioc_type
+  - source_feed
   - timestamp
-  - threat_types
-  - text
 
-# Email configuration (uncomment and configure if needed)
-# email:
-#   - "security@yourcompany.com"
-# smtp_host: "smtp.gmail.com"
-# smtp_port: 587
-# smtp_ssl: true
-# from_addr: "alerts@yourcompany.com"
-# smtp_auth_file: "/opt/elastalert/smtp_auth.yaml"
-
-# Prevent alert spam
 realert:
-  minutes: 30
-
-# Maximum 10 alerts per rule run
-max_query_size: 10
+  minutes: 5

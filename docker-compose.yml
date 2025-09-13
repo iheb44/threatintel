@@ -1,8 +1,8 @@
-# docker-compose.enhanced.yml
-# This builds on your existing setup with enterprise features
+# docker-compose.yml
+# Threat Intelligence Feed Processing Setup
 
 services:
-  # ===== EXISTING SERVICES (ENHANCED) =====
+  # ===== INFRASTRUCTURE SERVICES =====
   
   tor:
     image: dperson/torproxy:latest
@@ -50,6 +50,45 @@ services:
       timeout: 10s
       retries: 5
 
+  elasticsearch-init:
+    image: appropriate/curl:latest
+    container_name: es-init
+    depends_on:
+      - elasticsearch
+    networks:
+      - dw-net
+    command: >
+      sh -c "
+      echo 'Waiting for Elasticsearch...';
+      until curl -s http://elasticsearch:9200 >/dev/null; do sleep 5; done;
+      echo 'Creating IOC index template...';
+      curl -X PUT http://elasticsearch:9200/_index_template/iocs_template -H 'Content-Type: application/json' -d '
+      {
+        \"index_patterns\": [\"iocs*\"],
+        \"template\": {
+          \"mappings\": {
+            \"properties\": {
+              \"ioc_value\": {\"type\": \"keyword\"},
+              \"ioc_type\": {\"type\": \"keyword\"},
+              \"source_feed\": {\"type\": \"keyword\"},
+              \"feed_url\": {\"type\": \"keyword\"},
+              \"timestamp\": {\"type\": \"date\"},
+              \"content_hash\": {\"type\": \"keyword\"},
+              \"threat_types\": {\"type\": \"keyword\"},
+              \"entities\": {
+                \"properties\": {
+                  \"ips\": {\"type\": \"ip\"},
+                  \"domains\": {\"type\": \"keyword\"},
+                  \"cves\": {\"type\": \"keyword\"}
+                }
+              }
+            }
+          }
+        }
+      }';
+      echo 'IOC template created successfully';
+      "
+
   kibana:
     image: docker.elastic.co/kibana/kibana:8.8.1
     container_name: kibana
@@ -71,6 +110,145 @@ services:
       timeout: 10s
       retries: 5
 
+  # ===== THREAT INTELLIGENCE PROCESSING =====
+
+  crawler-enhanced:
+    build:
+      context: ./crawler
+      dockerfile: Dockerfile
+    container_name: dw-crawler-enhanced
+    restart: unless-stopped
+    command: python -m crawler  # Using feed crawler for threat intelligence
+    environment:
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
+      - TOR_SOCKS=tor:9050
+      - USE_TOR=${USE_TOR:-false}
+      - MAX_PAGES_PER_SEED=${MAX_PAGES_PER_SEED:-5}
+      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - ENABLE_PII_REDACTION=${ENABLE_PII_REDACTION:-false}
+      - USE_PLAYWRIGHT=${USE_PLAYWRIGHT:-false}
+      - ES_INDEX=iocs  # Using iocs index for threat data
+      - CRAWLER_TYPE=feed  # Feed processing mode
+    volumes:
+      - ./crawler/config:/app/config
+      - ./crawler/state:/app/state
+      - crawler_logs:/app/logs
+    depends_on:
+      - elasticsearch
+      - postgres
+      - redis
+    networks:
+      - dw-net
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  celery-worker:
+    build:
+      context: ./crawler
+      dockerfile: Dockerfile
+    command: celery -A crawler_tasks worker --loglevel=info --concurrency=4 -Q feeds,monitoring
+    environment:
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
+      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - ES_INDEX=iocs  # Using iocs index
+    volumes:
+      - ./crawler:/app
+      - ./crawler/config:/app/config
+      - crawler_logs:/app/logs
+    working_dir: /app
+    depends_on:
+      - redis
+      - postgres
+      - elasticsearch
+    networks:
+      - dw-net
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  celery-beat:
+    build:
+      context: ./crawler
+      dockerfile: Dockerfile
+    command: celery -A crawler_tasks beat --loglevel=info
+    environment:
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
+      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    volumes:
+      - ./crawler:/app
+      - ./crawler/config:/app/config
+      - celerybeat_schedule:/app/celerybeat-schedule
+    working_dir: /app
+    depends_on:
+      - redis
+    networks:
+      - dw-net
+
+  # ===== API & INTERFACE SERVICES =====
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: dw-api
+    ports:
+      - "8000:8000"
+    environment:
+      - ELASTIC_HOST=elasticsearch
+      - ELASTIC_PORT=9200
+      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
+      - REDIS_URL=redis://redis:6379/0
+      - ES_INDEX=iocs  # Using iocs index for threat data
+    volumes:
+      - ./api/config:/app/config
+    depends_on:
+      - elasticsearch
+      - postgres
+      - redis
+    networks:
+      - dw-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  elastalert:
+    image: jertel/elastalert2:2.15.0
+    container_name: elastalert
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_USE_SSL=False
+      - ES_INDEX=iocs  # Using iocs index for alerts
+    volumes:
+      - ./elastalert/rules:/opt/elastalert/rules
+      - ./elastalert/config.yaml:/opt/elastalert/config.yaml
+      - elastalert_data:/opt/elastalert/data
+    depends_on:
+      - elasticsearch
+    networks:
+      - dw-net
+
+  # ===== MONITORING & METRICS =====
+
   grafana:
     image: grafana/grafana:10.0.0
     container_name: grafana
@@ -89,24 +267,34 @@ services:
       - elasticsearch
       - prometheus
 
-  elastalert:
-    image: jertel/elastalert2:2.15.0
-    container_name: elastalert
-    restart: unless-stopped
-    environment:
-      - ELASTICSEARCH_HOST=elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - ELASTICSEARCH_USE_SSL=False
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
     volumes:
-      - ./elastalert/rules:/opt/elastalert/rules
-      - ./elastalert/config.yaml:/opt/elastalert/config.yaml
-      - elastalert_data:/opt/elastalert/data
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - dw-net
     depends_on:
-      - elasticsearch
+      - crawler-enhanced
+
+  flower:
+    image: mher/flower:latest
+    container_name: flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - FLOWER_BASIC_AUTH=admin:${FLOWER_PASSWORD:-admin}
+    depends_on:
+      - redis
     networks:
       - dw-net
 
-  # ===== NEW ENTERPRISE SERVICES =====
+  # ===== DATABASE & QUEUE SERVICES =====
 
   postgres:
     image: postgres:15-alpine
@@ -164,146 +352,7 @@ services:
       timeout: 10s
       retries: 5
 
-  crawler-enhanced:
-    build:
-      context: ./crawler
-      dockerfile: Dockerfile
-    container_name: dw-crawler-enhanced
-    restart: unless-stopped
-    environment:
-      - ELASTIC_HOST=elasticsearch
-      - ELASTIC_PORT=9200
-      - TOR_SOCKS=tor:9050
-      - USE_TOR=${USE_TOR:-false}
-      - MAX_PAGES_PER_SEED=${MAX_PAGES_PER_SEED:-20}
-      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - ENABLE_PII_REDACTION=${ENABLE_PII_REDACTION:-false}
-      - USE_PLAYWRIGHT=${USE_PLAYWRIGHT:-false}
-    volumes:
-      - ./crawler/config:/app/config
-      - ./crawler/state:/app/state
-      - crawler_logs:/app/logs
-    depends_on:
-      - tor
-      - elasticsearch
-      - postgres
-      - redis
-    networks:
-      - dw-net
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-
-  # FIXED: Celery worker with correct module path
-  celery-worker:
-    build:
-      context: ./crawler
-      dockerfile: Dockerfile
-    command: celery -A crawler_tasks worker --loglevel=info --concurrency=4
-    environment:
-      - ELASTIC_HOST=elasticsearch
-      - ELASTIC_PORT=9200
-      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-    volumes:
-      - ./crawler:/app
-      - ./crawler/config:/app/config
-      - crawler_logs:/app/logs
-    working_dir: /app
-    depends_on:
-      - redis
-      - postgres
-      - elasticsearch
-    networks:
-      - dw-net
-    deploy:
-      replicas: 2
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-
-  # FIXED: Celery beat with correct module path
-  celery-beat:
-    build:
-      context: ./crawler
-      dockerfile: Dockerfile
-    command: celery -A crawler_tasks beat --loglevel=info
-    environment:
-      - ELASTIC_HOST=elasticsearch
-      - ELASTIC_PORT=9200
-      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-    volumes:
-      - ./crawler:/app
-      - ./crawler/config:/app/config
-      - celerybeat_schedule:/app/celerybeat-schedule
-    working_dir: /app
-    depends_on:
-      - redis
-    networks:
-      - dw-net
-
-  flower:
-    image: mher/flower:latest
-    container_name: flower
-    command: celery --broker=redis://redis:6379/0 flower --port=5555
-    ports:
-      - "5555:5555"
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - FLOWER_BASIC_AUTH=admin:${FLOWER_PASSWORD:-admin}
-    depends_on:
-      - redis
-    networks:
-      - dw-net
-
-  api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    container_name: dw-api
-    ports:
-      - "8000:8000"
-    environment:
-      - ELASTIC_HOST=elasticsearch
-      - ELASTIC_PORT=9200
-      - POSTGRES_DSN=postgresql://crawler:${POSTGRES_PASSWORD:-SecurePass123!}@postgres:5432/threatintel
-      - REDIS_URL=redis://redis:6379/0
-    volumes:
-      - ./api/config:/app/config
-    depends_on:
-      - elasticsearch
-      - postgres
-      - redis
-    networks:
-      - dw-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
-
-  # FIXED: Prometheus with correct mount path
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - dw-net
-    depends_on:
-      - crawler-enhanced
+  # ===== NETWORK & PROXY SERVICES =====
 
   nginx:
     image: nginx:alpine
@@ -323,6 +372,7 @@ services:
     networks:
       - dw-net
     restart: unless-stopped
+
   elasticsearch-exporter:
     image: bitnami/elasticsearch-exporter:latest
     container_name: elasticsearch-exporter
@@ -340,6 +390,7 @@ services:
       - elasticsearch
     networks:
       - dw-net 
+
   redis-exporter:
     image: oliver006/redis_exporter:latest
     container_name: redis-exporter
@@ -351,6 +402,9 @@ services:
       - redis
     networks:
       - dw-net
+
+# ===== NETWORKS & VOLUMES =====
+
 networks:
   dw-net:
     driver: bridge

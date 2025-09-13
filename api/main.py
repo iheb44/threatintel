@@ -1,9 +1,10 @@
+import os
 from fastapi import FastAPI, HTTPException, Response, Query, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
-import os, requests, csv, io, json, logging
+import requests, csv, io, json, logging
 from datetime import datetime
 
 # Configure logging
@@ -14,19 +15,19 @@ logger = logging.getLogger(__name__)
 ES_HOST = os.getenv("ELASTIC_HOST", "elasticsearch")
 ES_PORT = os.getenv("ELASTIC_PORT", "9200")
 ES_URL = f"http://{ES_HOST}:{ES_PORT}"
-ES_INDEX = os.getenv("ES_INDEX", "posts")
+ES_INDEX = os.getenv("ES_INDEX", "iocs")  # Changed from "posts" to "iocs"
 API_KEY = os.getenv("API_KEY")  # Optional API key for authentication
 
 app = FastAPI(
-    title="Dark Web Intelligence API",
-    description="API for searching and exporting dark web threat intelligence data",
+    title="Threat Intelligence API",
+    description="API for searching and exporting threat intelligence IOC data",
     version="1.0.0"
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,12 +70,12 @@ def elasticsearch_request(endpoint: str, body: dict = None, timeout: int = 10):
 
 def build_search_query(
     q: str = "",
-    threat_types: List[str] = None,
+    ioc_types: List[str] = None,  # Changed from threat_types
     date_from: str = None,
     date_to: str = None,
     size: int = 50
 ) -> dict:
-    """Build Elasticsearch query with filters"""
+    """Build Elasticsearch query for IOC data"""
     query = {"bool": {"must": []}}
     
     # Text search
@@ -82,17 +83,17 @@ def build_search_query(
         query["bool"]["must"].append({
             "multi_match": {
                 "query": q,
-                "fields": ["title^2", "text", "url"],
+                "fields": ["ioc_value^2", "source_feed", "ioc_type"],
                 "fuzziness": "AUTO"
             }
         })
     else:
         query["bool"]["must"].append({"match_all": {}})
     
-    # Threat type filters
-    if threat_types:
+    # IOC type filters
+    if ioc_types:
         query["bool"]["must"].append({
-            "terms": {"threat_type.keyword": threat_types}
+            "terms": {"ioc_type": ioc_types}
         })
     
     # Date range filter
@@ -106,9 +107,9 @@ def build_search_query(
     
     return {
         "query": query,
-        "size": min(size, 1000),  # Limit max size
+        "size": min(size, 1000),
         "sort": [{"timestamp": {"order": "desc"}}],
-        "_source": ["title", "url", "text", "timestamp", "threat_type", "severity", "tags"]
+        "_source": ["ioc_value", "ioc_type", "source_feed", "timestamp", "threat_types", "entities"]
     }
 
 # API Endpoints
@@ -128,19 +129,19 @@ def health_check():
     )
 
 @app.get("/search", response_model=SearchResponse)
-def search_posts(
+def search_iocs(  # Changed from search_posts
     q: str = Query("", description="Search query"),
-    threat_types: Optional[List[str]] = Query(None, description="Filter by threat types"),
+    ioc_types: Optional[List[str]] = Query(None, description="Filter by IOC types"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     size: int = Query(50, ge=1, le=1000, description="Number of results"),
     credentials: HTTPAuthorizationCredentials = Depends(verify_api_key)
 ):
-    """Search dark web intelligence data"""
+    """Search threat intelligence IOCs"""
     
-    query_body = build_search_query(q, threat_types, date_from, date_to, size)
+    query_body = build_search_query(q, ioc_types, date_from, date_to, size)
     
-    logger.info(f"Search query: {q}, filters: {threat_types}, size: {size}")
+    logger.info(f"Search query: {q}, filters: {ioc_types}, size: {size}")
     
     result = elasticsearch_request(f"{ES_INDEX}/_search", query_body, timeout=30)
     
@@ -153,15 +154,15 @@ def search_posts(
 @app.get("/export/csv")
 def export_csv(
     q: str = Query("", description="Search query"),
-    threat_types: Optional[List[str]] = Query(None, description="Filter by threat types"),
+    ioc_types: Optional[List[str]] = Query(None, description="Filter by IOC types"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     size: int = Query(1000, ge=1, le=5000, description="Number of results"),
     credentials: HTTPAuthorizationCredentials = Depends(verify_api_key)
 ):
-    """Export search results as CSV"""
+    """Export IOCs as CSV"""
     
-    query_body = build_search_query(q, threat_types, date_from, date_to, size)
+    query_body = build_search_query(q, ioc_types, date_from, date_to, size)
     
     logger.info(f"CSV export: {q}, size: {size}")
     
@@ -171,42 +172,41 @@ def export_csv(
     output = io.StringIO()
     writer = csv.writer(output)
     
-    # CSV headers
+    # CSV headers for IOC data
     writer.writerow([
-        "title", "url", "text_preview", "timestamp", 
-        "threat_type", "severity", "tags"
+        "ioc_value", "ioc_type", "source_feed", "timestamp", 
+        "threat_types", "entities"
     ])
     
     for hit in hits:
         source = hit.get("_source", {})
         writer.writerow([
-            source.get("title", ""),
-            source.get("url", ""),
-            (source.get("text", ""))[:500].replace("\n", " ").replace("\r", ""),
+            source.get("ioc_value", ""),
+            source.get("ioc_type", ""),
+            source.get("source_feed", ""),
             source.get("timestamp", ""),
-            source.get("threat_type", ""),
-            source.get("severity", ""),
-            ", ".join(source.get("tags", []))
+            ", ".join(source.get("threat_types", [])),
+            json.dumps(source.get("entities", {}))
         ])
     
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=intelligence_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=iocs_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
     )
 
 @app.get("/export/json")
 def export_json(
     q: str = Query("", description="Search query"),
-    threat_types: Optional[List[str]] = Query(None, description="Filter by threat types"),
+    ioc_types: Optional[List[str]] = Query(None, description="Filter by IOC types"),
     date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     size: int = Query(1000, ge=1, le=5000, description="Number of results"),
     credentials: HTTPAuthorizationCredentials = Depends(verify_api_key)
 ):
-    """Export search results as JSON"""
+    """Export IOCs as JSON"""
     
-    query_body = build_search_query(q, threat_types, date_from, date_to, size)
+    query_body = build_search_query(q, ioc_types, date_from, date_to, size)
     
     logger.info(f"JSON export: {q}, size: {size}")
     
@@ -216,7 +216,7 @@ def export_json(
         "export_timestamp": datetime.utcnow().isoformat(),
         "query": q,
         "filters": {
-            "threat_types": threat_types,
+            "ioc_types": ioc_types,
             "date_from": date_from,
             "date_to": date_to
         },
@@ -228,28 +228,28 @@ def export_json(
     return Response(
         content=json.dumps(export_data, indent=2),
         media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename=intelligence_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"}
+        headers={"Content-Disposition": f"attachment; filename=iocs_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"}
     )
 
 @app.get("/stats")
 def get_statistics(credentials: HTTPAuthorizationCredentials = Depends(verify_api_key)):
-    """Get threat intelligence statistics"""
+    """Get IOC statistics"""
     
     # Total documents
     total_query = {"query": {"match_all": {}}}
     total_result = elasticsearch_request(f"{ES_INDEX}/_count", total_query)
     
-    # Threat type aggregation
+    # IOC type aggregation
     agg_query = {
         "size": 0,
         "aggs": {
-            "threat_types": {
+            "ioc_types": {
                 "terms": {
-                    "field": "threat_type.keyword",
+                    "field": "ioc_type",
                     "size": 20
                 }
             },
-            "recent_posts": {
+            "recent_iocs": {
                 "date_histogram": {
                     "field": "timestamp",
                     "calendar_interval": "1d",
@@ -263,13 +263,13 @@ def get_statistics(credentials: HTTPAuthorizationCredentials = Depends(verify_ap
     
     return {
         "total_documents": total_result["count"],
-        "threat_types": [
+        "ioc_types": [
             {"type": bucket["key"], "count": bucket["doc_count"]}
-            for bucket in agg_result["aggregations"]["threat_types"]["buckets"]
+            for bucket in agg_result["aggregations"]["ioc_types"]["buckets"]
         ],
         "daily_activity": [
             {"date": bucket["key_as_string"][:10], "count": bucket["doc_count"]}
-            for bucket in agg_result["aggregations"]["recent_posts"]["buckets"][:30]
+            for bucket in agg_result["aggregations"]["recent_iocs"]["buckets"][:30]
         ]
     }
 

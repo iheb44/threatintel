@@ -1,0 +1,6 @@
+ioc_value,ioc_type,source_feed,timestamp,threat_types,entities
+CVE-2021-38649,cve,cisa_known_exploited_vulns,2025-09-13T03:47:29.680000,ioc,"{""cves"": [""CVE-2021-38649""]}"
+CVE-2020-0688,cve,cisa_known_exploited_vulns,2025-09-13T03:47:29.680001,ioc,"{""cves"": [""CVE-2020-0688""]}"
+CVE-2017-0143,cve,cisa_known_exploited_vulns,2025-09-13T03:47:29.680003,ioc,"{""cves"": [""CVE-2017-0143""]}"
+CVE-2016-7255,cve,cisa_known_exploited_vulns,2025-09-13T03:47:29.680004,ioc,"{""cves"": [""CVE-2016-7255""]}"
+CVE-2019-0708,cve,cisa_known_exploited_vulns,2025-09-13T03:47:29.680006,ioc,"{""cves"": [""CVE-2019-0708""]}"
