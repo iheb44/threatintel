@@ -1,0 +1,81 @@
+# Suspicious Activity Detection Rule
+# Monitors for medium-level threats and patterns
+
+name: "Suspicious IOC Activity"
+type: frequency
+index: iocs
+timestamp_field: timestamp
+is_enabled: true
+
+run_every:
+  minutes: 5
+
+buffer_time:
+  minutes: 15
+
+# Alert when we see 3+ medium/high threats from same source in 15 minutes
+num_events: 3
+timeframe:
+  minutes: 15
+
+# Filter for medium+ severity threats
+filter:
+- range:
+    timestamp:
+      gte: "now-15m"
+- terms:
+    threat_level: ["medium", "high"]
+- bool:
+    must_not:
+      - term:
+          false_positive: true
+
+# Group by source feed to detect campaigns
+query_key:
+  - source_feed
+
+include:
+  - ioc_value
+  - ioc_type
+  - source_feed
+  - timestamp
+  - threat_level
+  - confidence_score
+
+alert:
+  - "slack"
+
+# Slack configuration for suspicious activity
+slack_webhook_url: "${SLACK_WEBHOOK_URL}"
+slack_channel_override: "#threat-monitoring"
+slack_icon_emoji: ":warning:"
+slack_msg_color: "warning"
+slack_username: "ThreatIntel-Monitor"
+
+slack_attachments:
+- color: "warning"
+  title: "⚠️ SUSPICIOUS ACTIVITY PATTERN"
+  text: |
+    **DETECTION:** {0} suspicious IOCs from {1} in 15 minutes
+    
+    **PATTERN DETAILS:**
+    • Source Feed: {1}
+    • Time Window: 15 minutes
+    • IOC Count: {0}
+    
+    **RECOMMENDED ACTIONS:**
+    • Review source feed for threat campaign
+    • Investigate related IOCs
+    • Monitor for additional activity
+    
+    _This may indicate an active threat campaign._
+  footer: "Threat Intelligence Platform | Pattern Detection"
+
+slack_attachments_args:
+  - num_matches
+  - source_feed
+
+realert:
+  hours: 4  # Alert every 4 hours for ongoing patterns
+
+max_query_size: 50

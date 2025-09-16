@@ -1,64 +1,46 @@
-# Dockerfile.enterprise
 FROM python:3.11-slim
 
-# Install system dependencies
+# Install system dependencies efficiently
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
     curl \
     wget \
     gnupg \
-    && rm -rf /var/lib/apt/lists/*
+    dnsutils \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Install Playwright dependencies
-RUN apt-get update && apt-get install -y \
-    libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libatspi2.0-0 \
-    libx11-6 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libxcb1 \
-    libxkbcommon0 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
-    && rm -rf /var/lib/apt/lists/*
+# Only install Playwright if USE_PLAYWRIGHT is enabled (reduce image size)
+# Remove the always-install approach for better efficiency
 
 WORKDIR /app
 
-# Copy requirements
+# Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
-# Install Python packages
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python packages with better caching and security
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
-RUN playwright install chromium
-
-# Download spaCy model for PII detection
-RUN python -m spacy download en_core_web_sm
+# Remove spaCy model download since ENABLE_PII_REDACTION=false
+# Only install if actually needed
 
 # Copy application code
-COPY crawler.py .
-COPY crawler_tasks.py .
-COPY config/ ./config/
+COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 crawler && chown -R crawler:crawler /app
+# Create directories with proper permissions
+RUN mkdir -p /app/logs /app/state /app/config \
+    && chmod 755 /app/logs /app/state /app/config
+
+# Create non-root user for security
+RUN useradd -m -u 1000 crawler \
+    && chown -R crawler:crawler /app
 USER crawler
 
-# Expose Prometheus metrics port
-EXPOSE 8001
+# Health check endpoint (matches your API pattern)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8001/health || exit 1
 
-CMD ["python", "crawler.py"]
+# Use main.py as entry point
+CMD ["python", "main.py"]

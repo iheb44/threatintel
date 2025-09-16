@@ -1,0 +1,11 @@
+.env
+*.env
+
+# API keys and secrets
+*_key
+*_token
+*_secret
+
+# Database files
+*.db
+*.sqlite

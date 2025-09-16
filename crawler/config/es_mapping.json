@@ -1,0 +1,153 @@
+{
+  "mappings": {
+    "properties": {
+      "ioc_value": {
+        "type": "keyword",
+        "normalizer": "lowercase_normalizer"
+      },
+      "ioc_type": {
+        "type": "keyword"
+      },
+      "source_feed": {
+        "type": "keyword"
+      },
+      "feed_url": {
+        "type": "keyword"
+      },
+      "timestamp": {
+        "type": "date"
+      },
+      "content_hash": {
+        "type": "keyword"
+      },
+      "threat_types": {
+        "type": "keyword"
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "entities": {
+        "properties": {
+          "ips": {
+            "type": "ip"
+          },
+          "domains": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer"
+          },
+          "urls": {
+            "type": "keyword"
+          },
+          "hashes": {
+            "type": "keyword",
+            "normalizer": "lowercase_normalizer"
+          },
+          "cves": {
+            "type": "keyword",
+            "normalizer": "uppercase_normalizer"
+          },
+          "network": {
+            "type": "keyword"
+          },
+          "root_domain": {
+            "type": "keyword"
+          },
+          "tld": {
+            "type": "keyword"
+          }
+        }
+      },
+      "enrichment": {
+        "properties": {
+          "geoip": {
+            "properties": {
+              "country": {
+                "type": "keyword"
+              },
+              "country_code": {
+                "type": "keyword"
+              },
+              "city": {
+                "type": "keyword"
+              },
+              "latitude": {
+                "type": "float"
+              },
+              "longitude": {
+                "type": "float"
+              },
+              "asn": {
+                "type": "keyword"
+              },
+              "org": {
+                "type": "keyword"
+              }
+            }
+          },
+          "asn": {
+            "properties": {
+              "asn": {
+                "type": "keyword"
+              },
+              "ip_range": {
+                "type": "keyword"
+              },
+              "country": {
+                "type": "keyword"
+              }
+            }
+          },
+          "threat_actors": {
+            "type": "keyword"
+          },
+          "malware_families": {
+            "type": "keyword"
+          },
+          "attack_techniques": {
+            "type": "keyword"
+          }
+        }
+      },
+      "metadata": {
+        "properties": {
+          "processed_at": {
+            "type": "date"
+          },
+          "enriched_at": {
+            "type": "date"
+          },
+          "normalized": {
+            "type": "boolean"
+          },
+          "enrichment_status": {
+            "type": "keyword"
+          }
+        }
+      },
+      "relationships": {
+        "properties": {
+          "related_iocs": {
+            "type": "keyword"
+          },
+          "relationship_type": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  },
+  "settings": {
+    "analysis": {
+      "normalizer": {
+        "lowercase_normalizer": {
+          "type": "custom",
+          "filter": ["lowercase"]
+        },
+        "uppercase_normalizer": {
+          "type": "custom",
+          "filter": ["uppercase"]
+        }
+      }
+    }
+  }
+}

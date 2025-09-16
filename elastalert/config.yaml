@@ -1,4 +1,4 @@
-# ElastAlert2 Configuration
+# ElastAlert2 Configuration - Threat Intelligence Platform
 
 # Elasticsearch connection
 es_host: elasticsearch
@@ -12,41 +12,74 @@ verify_certs: False
 # ElastAlert settings
 rules_folder: /opt/elastalert/rules
 run_every:
-  minutes: 5
+  minutes: 1  # Check more frequently for threats
 
 buffer_time:
-  minutes: 15
+  minutes: 5  # Reduce buffer for faster alerts
 
-# Elasticsearch index for ElastAlert metadata
+# Elasticsearch indices for ElastAlert metadata
 writeback_index: elastalert_status
 writeback_alias: elastalert_alerts
 
-# Alert index (optional)
+# Alert configuration
 alert_time_limit:
-  days: 2
+  days: 7
 
-# Logging - FIXED: Use container path and simpler config
+# Performance tuning
+max_query_size: 10000
+scroll_size: 1000
+
+# Logging configuration
 logging:
   version: 1
   formatters:
-    simple:
-      format: '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+    detailed:
+      format: '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
       datefmt: '%Y-%m-%d %H:%M:%S'
   handlers:
     console:
       class: logging.StreamHandler
       level: INFO
-      formatter: simple
+      formatter: detailed
       stream: ext://sys.stdout
+    file:
+      class: logging.handlers.RotatingFileHandler
+      filename: /opt/elastalert/logs/elastalert.log
+      maxBytes: 10485760  # 10MB
+      backupCount: 3
+      level: DEBUG
+      formatter: detailed
   loggers:
     elastalert:
       level: INFO
-      handlers: [console]
+      handlers: [console, file]
       propagate: false
     elasticsearch:
+      level: WARNING
+      handlers: [console, file]
+      propagate: false
+    requests:
       level: WARNING
       handlers: [console]
       propagate: false
   root:
-    level: WARNING
+    level: INFO
     handlers: [console]
+
+# Global alert settings (can be overridden in rules)
+# NOTE: Use environment variables for sensitive data
+slack_webhook_url: "${SLACK_WEBHOOK_URL}"
+slack_emoji_override: ":warning:"
+slack_msg_color: "danger"
+slack_username: "ThreatIntel-Bot"
+
+# Email settings (backup alerting method)
+smtp_host: "${SMTP_HOST:-localhost}"
+smtp_port: "${SMTP_PORT:-587}"
+smtp_ssl: "${SMTP_SSL:-true}"
+from_addr: "${ALERT_FROM_EMAIL:-alerts@your-domain.com}"
+email_reply_to: "${ALERT_REPLY_TO:-security@your-domain.com}"
+
+# Default email recipients for critical alerts
+email: 
+  - "${SECURITY_EMAIL:-security@your-domain.com}"

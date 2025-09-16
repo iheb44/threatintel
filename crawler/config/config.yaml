@@ -1,21 +1,31 @@
-# Dark Web Threat Intelligence Feed Monitor
-# Focus: Machine-readable IOC feeds for actionable alerts.
+# Enhanced Threat Intelligence Feed Configuration
+use_tor: true
+tor_proxy: "socks5h://tor:9050"  # Changed to Docker service name
+user_agent: "Mozilla/5.0 (X11; Linux x86_64) ThreatIntelCrawler/2.0"
 
-use_tor: false
-tor_proxy: "socks5h://127.0.0.1:9050"
-
-crawl_interval: 1800  # Check feeds every 30 minutes
-request_delay: 8      # Be polite to free feed providers
+# Enhanced Crawling Behavior
+crawl_interval: 1800
+request_delay: 2
 timeout: 30
+max_retries: 5
+max_concurrent_requests: 3
+max_failures_before_skip: 3
+failure_cooldown: 3600  # 1 hour cooldown after max failures
 
+# Enhanced Feed Targets with Priority and Frequency
 targets:
-  # ===== CRITICAL: MALICIOUS URL & DOMAIN FEEDS =====
+  # ===== CRITICAL FEEDS (Checked every 15 minutes) =====
   - name: "urlhaus_domain_feed"
     url: "https://urlhaus.abuse.ch/downloads/hostfile/"
     type: "domain_feed"
-    format: "text"  # This is a hosts.txt format
+    format: "text"
     enabled: true
     priority: "critical"
+    check_interval: 900
+    retry_backoff: 2.0
+    parsing_rules:
+      line_format: "hosts"
+      field_separator: "\t"
 
   - name: "openphish_feed"
     url: "https://openphish.com/feed.txt"
@@ -23,14 +33,30 @@ targets:
     format: "text"
     enabled: true
     priority: "critical"
+    check_interval: 900
+    requires_tor: false
 
-  # ===== CRITICAL: MALWARE HASH FEEDS =====
+  - name: "cisa_known_exploited_vulns"
+    url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    type: "vulnerability_feed"
+    format: "json"
+    enabled: true
+    priority: "critical"
+    check_interval: 900
+    json_path: "$.vulnerabilities[*]"
+
+  # ===== HIGH PRIORITY FEEDS (Checked every 30 minutes) =====
   - name: "malware_bazaar_recent_hashes"
     url: "https://mb-api.abuse.ch/downloads/csv_recent/"
     type: "hash_feed"
     format: "csv"
     enabled: true
-    priority: "critical"
+    priority: "high"
+    check_interval: 1800
+    csv_fields:
+      sha256: "sha256_hash"
+      md5: "md5_hash"
+      first_seen: "firstseen"
 
   - name: "abuse_ch_ssl_blacklist"
     url: "https://sslbl.abuse.ch/blacklist/sslblacklist.csv"
@@ -38,67 +64,239 @@ targets:
     format: "csv"
     enabled: true
     priority: "high"
+    check_interval: 1800
+    csv_fields:
+      sha1: "SHA1"
+      listing_date: "Listingdate"
 
-  # ===== HIGH: MALICIOUS IP FEEDS =====
-  - name: "ci_army_ips"
-    url: "http://cinsscore.com/list/ci-badguys.txt"
+  # ===== MEDIUM PRIORITY FEEDS (Checked every 1 hour) =====
+  - name: "alienvault_otx_pulse"
+    url: "https://otx.alienvault.com/api/v1/pulses/subscribed"
+    type: "ioc_feed"
+    format: "json"
+    enabled: true
+    priority: "medium"
+    check_interval: 3600
+    requires_api_key: true
+    auth_header: "X-OTX-API-KEY"
+
+  - name: "virustotal_ip_reputation"
+    url: "https://www.virustotal.com/api/v3/feeds/ip-addresses"
+    type: "ip_feed"
+    format: "json"
+    enabled: false  # Disabled - requires proper API key setup
+    priority: "medium"
+    check_interval: 3600
+    requires_api_key: true
+    auth_header: "x-apikey"
+
+  # ===== DARK WEB FEEDS (Require Tor) =====
+  - name: "darkfeed_ransomware"
+    url: "http://darkfeedqz6xofe2cfaqj5dty2q6q6v63qy4j75q2rv7v35vcfqdad.onion/feed.txt"
+    type: "ransomware_feed"
+    format: "text"
+    enabled: true  # Enabled since use_tor=true
+    priority: "high"
+    requires_tor: true
+    check_interval: 3600
+
+  - name: "dark_ioc_market"
+    url: "http://example.onion/iocs.csv"  # Changed to placeholder
+    type: "ioc_feed"
+    format: "csv"
+    enabled: false  # Disabled - example only
+    priority: "medium"
+    requires_tor: true
+    check_interval: 7200
+
+  # ===== ADDITIONAL OSINT FEEDS =====
+  - name: "spamhaus_drop_list"
+    url: "https://www.spamhaus.org/drop/drop.txt"
     type: "ip_feed"
     format: "text"
     enabled: true
     priority: "high"
+    check_interval: 21600
+    parsing_rules:
+      comment_indicators: [";", "#"]
+
+  - name: "spamhaus_edrop_list"
+    url: "https://www.spamhaus.org/drop/edrop.txt"
+    type: "ip_feed"
+    format: "text"
+    enabled: true
+    priority: "high"
+    check_interval: 21600
 
   - name: "blocklist_de_ips"
     url: "https://lists.blocklist.de/lists/all.txt"
     type: "ip_feed"
     format: "text"
     enabled: true
-    priority: "high"
+    priority: "medium"
+    check_interval: 3600
 
-  # ===== HIGH: EXPLOITATION INTELLIGENCE =====
-  - name: "cisa_known_exploited_vulns"
-    url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
-    type: "vulnerability_feed"
-    format: "json"
+  - name: "ci_army_ips"
+    url: "http://cinsscore.com/list/ci-badguys.txt"
+    type: "ip_feed"
+    format: "text"
     enabled: true
-    priority: "critical"  # This is critical intelligence
+    priority: "medium"
+    check_interval: 3600
 
-# Source priority configuration
-source_priority:
-  critical:
-    - "urlhaus_domain_feed"
-    - "openphish_feed"
-    - "malware_bazaar_recent_hashes"
-    - "cisa_known_exploited_vulns"
-  high:
-    - "abuse_ch_ssl_blacklist"
-    - "ci_army_ips"
-    - "blocklist_de_ips"
+  - name: "emerging_threats_compromised_ips"
+    url: "https://rules.emergingthreats.net/blockrules/compromised-ips.txt"
+    type: "ip_feed"
+    format: "text"
+    enabled: true
+    priority: "high"
+    check_interval: 3600
 
-# Parsing configuration for different formats
+  - name: "phishing_database"
+    url: "https://raw.githubusercontent.com/mitchellkrogza/Phishing.Database/master/phishing-links/ALL-phishing-links.txt"
+    type: "phishing_feed"
+    format: "text"
+    enabled: true
+    priority: "high"
+    check_interval: 14400
+
+# API Keys for premium feeds (USE ENVIRONMENT VARIABLES INSTEAD!)
+api_keys:
+  alienvault_otx: "${OTX_API_KEY}"  # Use env var, not hardcoded
+  virustotal: "${VT_API_KEY}"       # Use env var, not hardcoded
+  shodan: "${SHODAN_API_KEY}"
+
+# Feed failure tracking
+feed_failures:
+  max_failures: 3
+  cooldown_period: 3600
+  backoff_factor: 2.0
+
+# Rate limiting configuration
+rate_limiting:
+  enabled: true
+  max_requests_per_minute: 30
+  dynamic_delay: true
+  delay_increase_factor: 1.5
+  delay_decrease_factor: 0.9
+
+# Enhanced parsing configuration
 parsing:
   text:
-    line_delimiter: "\n"
+    comment_indicators: ["#", "//", ";", "//"]
+    skip_patterns: ["^#", "^//", "^;", "^$", "^<!", "^%"]
+    encoding: "utf-8"
   csv:
     delimiter: ","
-    fieldnames: ["first_seen", "url", "url_status", "threat", "tags", "urlhaus_link", "reporter"]  # Example for URLhaus
+    field_mappings:
+      malware_bazaar_recent_hashes:
+        sha256: "sha256_hash"
+        md5: "md5_hash"
+        url: "url"
+        first_seen: "firstseen"
+      abuse_ch_ssl_blacklist:
+        sha1: "SHA1"
+        listing_date: "Listingdate"
+        reason: "Reason"
   json:
-    ioc_path: "$.vulnerabilities[*].cveID"  # Path for CISA KEV
+    path_mappings:
+      cisa_known_exploited_vulns: 
+        ioc_path: "$.vulnerabilities[*].cveID"
+        ioc_type: "cve"
+      alienvault_otx_pulse:
+        ioc_path: "$.results[*].indicators[*].indicator"
+        ioc_type: "auto"
 
-# Alerting Logic (This is key! Integrates with your SIEM/EDR)
-alerting:
-  # The crawler's job is to COLLECT IOCs. The actual alert is generated elsewhere.
-  output_file: "./collected_iocs.json"  # File to dump new IOCs
-  # Your SIEM/EDR should watch this file and check for matches in your environment.
+# Output configuration
+output:
+  elasticsearch_index: "iocs"
+  file_backup: "/app/data/iocs_backup.json"
+  backup_interval: 86400
+  compression: true
+  max_file_size: "100MB"
 
-# Logging - Focus on what matters
+# IOC Processing Configuration
+ioc_processing:
+  normalization:
+    enabled: true
+    strict_validation: true
+    hash_lowercase: true
+    cve_uppercase: true
+    domain_lowercase: true
+    url_normalization: true
+    ip_normalization: true
+  
+  enrichment:
+    enabled: true
+    geoip_enabled: true
+    asn_enabled: true
+    threat_intel_enabled: true
+    timeout_seconds: 5
+    max_retries: 2
+    services:
+      geoip: ["ipapi", "ipapi_co", "ip_api_com"]
+      asn: ["team_cymru", "ipapi"]
+  
+  deduplication:
+    enabled: true
+    method: "content_hash"
+    hash_ttl_days: 30
+    memory_cache_size: 10000
+    redis_enabled: true
+  
+  relationships:
+    enabled: true
+    track_relationships: true
+    relationship_ttl_days: 7
+    group_by_source: true
+    group_by_time_window: 3600  # 1 hour
+
+# Time Configuration
+time:
+  default_timezone: "UTC"
+  timestamp_format: "iso8601"
+  normalize_timestamps: true
+  time_window: "1h"
+
+# Elasticsearch Configuration
+elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "iocs"
+  bulk_size: 1000
+  timeout: 30
+  normalizers:
+    lowercase:
+      type: "custom"
+      filter: ["lowercase"]
+    uppercase:
+      type: "custom"
+      filter: ["uppercase"]
+  mappings:
+    dynamic_templates:
+      - strings_as_keywords:
+          match_mapping_type: "string"
+          mapping:
+            type: "keyword"
+            ignore_above: 256
+
+# Logging Configuration
 logging:
   level: "INFO"
-  log_file: "./crawler.log"
-  log_iocs_collected: true  # Log how many new IOCs we got from each feed
-  log_errors: true
+  file: "/app/logs/crawler.log"
+  max_size: "100MB"
+  backup_count: 5
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-# Performance
-performance:
-  max_concurrent_requests: 1
-  retry_attempts: 2
-  user_agent: "Mozilla/5.0 (X11; Linux x86_64) ThreatIntelCrawler/1.0"
+# Monitoring Configuration
+monitoring:
+  health_check_interval: 300
+  metrics_enabled: true
+  prometheus_port: 8000
+  statsd_enabled: false
+
+# Alerting Configuration
+alerting:
+  enabled: true
+  webhook_url: "${ALERT_WEBHOOK_URL}"
+  min_severity: "high"
+  notification_channels: ["slack", "email"]

@@ -1,45 +1,134 @@
-name: "Critical IOC Detection"
+# Critical Threat Detection Rule
+# Triggers on high/critical severity IOCs only to reduce noise
+
+name: "Critical Threat IOCs"
 type: any
-index: iocs*
+index: iocs
 timestamp_field: timestamp
 is_enabled: true
 
 run_every:
-  minutes: 2
+  minutes: 1  # Check frequently for critical threats
 
 buffer_time:
-  minutes: 5
+  minutes: 5  # Quick response time
 
-# Alert on ALL IOCs initially (for testing)
+# Only alert on HIGH and CRITICAL threats
 filter:
-- query:
-    match_all: {}
+- range:
+    timestamp:
+      gte: "now-5m"  # Recent IOCs only
+- terms:
+    threat_level: ["high", "critical"]  # Only severe threats
+- bool:
+    must_not:
+      - term:
+          false_positive: true  # Exclude known false positives
 
 include:
   - ioc_value
   - ioc_type
   - source_feed
   - timestamp
+  - threat_types
+  - entities
+  - threat_level
+  - confidence_score
 
+# Multiple alert methods for critical threats
 alert:
-  - "debug"
+  - "slack"
+  - "email"
 
-alert_subject: "IOC Detected: {0}"
-alert_subject_args:
+# Slack configuration
+slack_webhook_url: "${SLACK_WEBHOOK_URL}"
+slack_channel_override: "#security-alerts"
+slack_icon_emoji: ":rotating_light:"
+slack_msg_color: "danger"
+slack_username: "ThreatIntel-Critical"
+
+slack_attachments:
+- color: "danger"
+  title: "🚨 CRITICAL THREAT IOC DETECTED"
+  text: |
+    **IOC VALUE:** `{0}`
+    **TYPE:** {1}
+    **SEVERITY:** {6} ({7}% confidence)
+    **SOURCE:** {2}
+    **DETECTED:** {3}
+    
+    **THREAT CATEGORIES:** {4}
+    **RELATED ENTITIES:** {5}
+    
+    **🔴 IMMEDIATE ACTIONS REQUIRED:**
+    • Block this IOC in security tools immediately
+    • Search logs for related activity
+    • Escalate to incident response team
+    • Document investigation findings
+    
+    _This is a high-priority automated alert._
+  footer: "Threat Intelligence Platform | Critical Alert"
+  ts: "{8}"
+
+slack_attachments_args:
   - ioc_value
+  - ioc_type  
+  - source_feed
+  - timestamp
+  - threat_types
+  - entities
+  - threat_level
+  - confidence_score
+  - timestamp
 
-alert_text: |
-  IOC detected in threat intelligence feed!
-  - Value: {0}
-  - Type: {1} 
-  - Source: {2}
-  - Time: {3}
+# Email configuration for critical alerts
+email_subject: "🚨 CRITICAL THREAT: {0} ({1}) - Immediate Action Required"
+email_subject_args:
+  - ioc_value
+  - ioc_type
 
-alert_text_args:
+email_body: |
+  CRITICAL THREAT INTELLIGENCE ALERT
+  
+  IOC VALUE: {0}
+  IOC TYPE: {1}
+  THREAT LEVEL: {6}
+  CONFIDENCE: {7}%
+  SOURCE FEED: {2}
+  DETECTION TIME: {3}
+  
+  THREAT CATEGORIES: {4}
+  RELATED ENTITIES: {5}
+  
+  IMMEDIATE ACTIONS REQUIRED:
+  1. Block this IOC in all security tools
+  2. Search SIEM/logs for related activity
+  3. Escalate to incident response team
+  4. Update threat intelligence platforms
+  
+  This is an automated alert from the Threat Intelligence Platform.
+  Do not reply to this email.
+
+email_body_args:
   - ioc_value
   - ioc_type
   - source_feed
   - timestamp
+  - threat_types
+  - entities
+  - threat_level
+  - confidence_score
 
+# Alert management
 realert:
-  minutes: 5
+  hours: 6  # Re-alert every 6 hours for critical threats
+
+exponential_realert:
+  hours: 1
+
+max_query_size: 20  # Keep query size small for performance
+
+# Query key for grouping similar alerts
+query_key:
+  - ioc_value
+  - ioc_type
